@@ -58,7 +58,8 @@ for vg in ${vgs}; do
 done
 
 # Remove GPT partition table
-do_cmd sgdisk -Z /dev/${TARGET_DISK} >&2
+# do_cmd sgdisk -Z /dev/${TARGET_DISK} >&2
+do_cmd dd if=/dev/zero of=/dev/${TARGET_DISK} bs=1024 count=1 >&2
 
 do_cmd vgchange -a n >&2 || exit ${Abort}
 do_cmd hdparm -z /dev/${TARGET_DISK} >&2

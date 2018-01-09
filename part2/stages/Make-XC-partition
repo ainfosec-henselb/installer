@@ -38,6 +38,7 @@ deactivate_lvm()
         echo "ERROR: Failure deactivating existing logical volumes." >&2
         return 1
     fi
+    do_cmd pvremove -ff /dev/sda2
     return 0
 }
 
@@ -58,7 +59,8 @@ remove_existing_partitions()
             # here will also cause the later creation commands to fail, so
             # handle errors there.
             do_cmd pvremove -ff -y "${PARTITION_DEV}" >&2
-            do_cmd sgdisk -d "${PARTITION_NUM}" "${DISK_DEV}" >&2
+            #do_cmd sgdisk -d "${PARTITION_NUM}" "${DISK_DEV}" >&2
+            parted -s "${DISK_DEV}" -- rm "${PARTITION_NUM}" >&2
         done
 
 		#Sync disk after removing the partitions
@@ -77,18 +79,29 @@ create_xc_partition()
     local PARTITION_DEV="/dev/${NODE}"
     local BOOT_FLAG_BIT="2"
 
-    if [ "${CREATE_XC_PARTITION}" = "true" ] ; then
-        mixedgauge "Creating ${PRODUCT_BRAND} disk partition..." 10
-        do_cmd sgdisk -N ${PARTITION_NUM} -t ${PARTITION_NUM}:${XC_PARTITION_TYPE} "${DISK_DEV}" >&2
-  	    realign_xc_partition
-    fi
+#    if [ "${CREATE_XC_PARTITION}" = "true" ] ; then
+#        mixedgauge "Creating ${PRODUCT_BRAND} disk partition..." 10
+#        #do_cmd sgdisk -N ${PARTITION_NUM} -t ${PARTITION_NUM}:${XC_PARTITION_TYPE} "${DISK_DEV}" >&2
+#        do_cmd parted -s "${DISK_DEV}" -- mktable gpt yes
+#        do_cmd parted -s "${DISK_DEV}" -- mkpart xc 100 -1  >&2
+#        do_cmd echo "partition num ${PARTITION_NUM}"
+#  	    #realign_xc_partition
+#    fi
+
+    mixedgauge "Creating ${PRODUCT_BRAND} disk partition..." 10
+    #do_cmd sgdisk -N ${PARTITION_NUM} -t ${PARTITION_NUM}:${XC_PARTITION_TYPE} "${DISK_DEV}" >&2
+    do_cmd parted -s "${DISK_DEV}" -- mktable gpt yes
+    do_cmd parted -s "${DISK_DEV}" -- mkpart efi fat32 1 100  >&2
+    do_cmd parted -s "${DISK_DEV}" -- mkpart xc 100 -1  >&2
+    do_cmd echo "partition num ${PARTITION_NUM}"
+    #realign_xc_partition
 
     mixedgauge "Activating ${PRODUCT_BRAND} disk partition..." 15
 
     # Set the legacy boot flag attribute
     # This is likely not needed for a GPT-based disk, but a small portion of BIOS's will
     # refuse to boot if it is not set
-    do_cmd sgdisk -A ${PARTITION_NUM}:set:${BOOT_FLAG_BIT} "${DISK_DEV}" >&2
+    #do_cmd sgdisk -A ${PARTITION_NUM}:set:${BOOT_FLAG_BIT} "${DISK_DEV}" >&2
 
     echo "New partition layout:" >&2
     gdisk -l "${DISK_DEV}" >&2
@@ -110,7 +123,9 @@ reread_partition_table()
 
     while true ; do
         ATTEMPTS=$((ATTEMPTS + 1))
-        echo -e "w\nY" | do_cmd gdisk "${DISK_DEV}" >&2 && break
+        #echo -e "w\nY" | do_cmd gdisk "${DISK_DEV}" >&2 && break
+        partprobe
+        break
 
         if [ "${ATTEMPTS}" -gt 30 ] ; then
             echo "ERROR: Unable to re-read partition table." >&2
@@ -153,12 +168,12 @@ realign_xc_partition()
         echo "Realigning ${PRODUCT_BRAND} partition: moving first sector" \
              "from {FIRST_SECTOR} to ${ALIGNED_FIRST_SECTOR}" >&2
 
-        do_cmd gdisk "${DISK_DEV}" <<EOF >&2
-x
-l
-${ALIGNED_FIRST_SECTOR}
-w
-EOF
+#        do_cmd gdisk "${DISK_DEV}" <<EOF >&2
+#x
+#l
+#${ALIGNED_FIRST_SECTOR}
+#w
+#EOF
     fi
 }
 

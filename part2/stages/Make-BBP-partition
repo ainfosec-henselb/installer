@@ -39,7 +39,8 @@ create_bios_boot_partition()
     local BBP_TYPE="EF02" # BIOS Boot Partition Typecode
 
     # Create the BBP
-    if ! do_cmd sgdisk -g -n ${BBP_PARTNUM}::${BBP_SIZE} -t ${BBP_PARTNUM}:${BBP_TYPE} "${DISK_DEV}" >&2 ; then
+    #if ! do_cmd sgdisk -g -n ${BBP_PARTNUM}::${BBP_SIZE} -t ${BBP_PARTNUM}:${BBP_TYPE} "${DISK_DEV}" >&2 ; then
+    if !do_cmd parted -s "${DISK_DEV}" -- bios 50 100 >&2 ; then
         echo "ERROR: Could not create BIOS Boot Partition." >&2
         return 1
     fi
